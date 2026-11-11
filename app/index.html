@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YHK 迷你热敏机 · 电脑直连打印</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%232b6de5'/%3E%3Cpath d='M7 8h10v6H7z' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+  :root { color-scheme: light; --bd:#e5e6eb; --tx:#1f2329; --mut:#646a73; --bg:#f5f6f8; --blue:#2b6de5; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; padding: 20px; background: var(--bg); color: var(--tx); }
+  h1 { font-size: 19px; margin: 0 0 14px; }
+  .layout { display: grid; grid-template-columns: 380px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+  .card { background: #fff; border: 1px solid var(--bd); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .row + .row { margin-top: 10px; }
+  label { font-size: 13px; color: var(--tx); display: inline-flex; gap: 6px; align-items: center; }
+  input[type=number], select, textarea { font: inherit; }
+  input[type=number], select { border: 1px solid var(--bd); border-radius: 8px; padding: 7px 8px; background: #fff; }
+  textarea { width: 100%; border: 1px solid var(--bd); border-radius: 8px; padding: 8px; resize: vertical; }
+  button { border: 0; border-radius: 8px; padding: 9px 15px; font-size: 14px; cursor: pointer; background: var(--blue); color: #fff; }
+  button:disabled { background: #b9c2cf; cursor: not-allowed; }
+  button.secondary { background: #eef1f5; color: var(--tx); }
+  button.ghost { background: transparent; color: var(--blue); padding: 6px 8px; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .tabs button { background: #eef1f5; color: var(--tx); }
+  .tabs button.active { background: var(--blue); color: #fff; }
+  .pane { display: none; }
+  .pane.active { display: block; }
+  #status { font-size: 14px; margin: 0; }
+  .hint { font-size: 12px; color: var(--mut); margin-top: 8px; line-height: 1.5; }
+  canvas.preview { background: #fff; border: 1px dashed #c9cdd4; border-radius: 8px; image-rendering: pixelated; width: 240px; max-width: 100%; height: auto; }
+  pre.log { background: #1f2329; color: #e6e8eb; border-radius: 10px; padding: 12px; font-size: 12px; line-height: 1.6; max-height: 240px; overflow: auto; white-space: pre-wrap; word-break: break-all; margin: 0; }
+  .seg { display: inline-flex; border: 1px solid var(--bd); border-radius: 8px; overflow: hidden; }
+  .seg button { background: #fff; color: var(--tx); border-radius: 0; padding: 7px 12px; }
+  .seg button.active { background: var(--blue); color: #fff; }
+  details { margin-top: 10px; }
+  summary { font-size: 13px; color: var(--mut); cursor: pointer; }
+  .preview-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+</style>
+</head>
+<body>
+  <h1>YHK 迷你热敏机 · 电脑直连打印（Web Bluetooth）</h1>
+  <div class="layout">
+    <!-- ===== 左：控制 ===== -->
+    <div>
+      <div class="card">
+        <div class="row">
+          <button id="connectBtn">连接打印机</button>
+          <button id="printBtn" disabled>打印</button>
+          <button id="disconnectBtn" class="secondary" disabled>断开</button>
+        </div>
+        <div class="row"><p id="status">未连接</p></div>
+      </div>
+
+      <div class="card">
+        <div class="tabs" id="sourceTabs">
+          <button data-pane="test" class="active">测试图案</button>
+          <button data-pane="text">文字</button>
+          <button data-pane="image">图片</button>
+          <button data-pane="qr">二维码</button>
+        </div>
+
+        <!-- 测试图案 -->
+        <div class="pane active" id="pane-test">
+          <div class="hint">内置棋盘格 + 标题 + 实心黑条，用于检查出图完整性与黑度。</div>
+        </div>
+
+        <!-- 文字 -->
+        <div class="pane" id="pane-text">
+          <textarea id="textInput" rows="5" placeholder="输入要打印的文字，支持多行…">YHK 热敏打印
+电脑直连测试</textarea>
+          <div class="row">
+            <label>字号 <select id="textSize">
+              <option value="14">14</option><option value="18" selected>18</option>
+              <option value="24">24</option><option value="32">32</option>
+            </select></label>
+            <label><input type="checkbox" id="textBold"> 加粗</label>
+            <label>对齐 <select id="textAlign">
+              <option value="left">左</option><option value="center" selected>中</option><option value="right">右</option>
+            </select></label>
+            <label>行距 <select id="textLine">
+              <option value="1.2">1.2</option><option value="1.5" selected>1.5</option><option value="2">2.0</option>
+            </select></label>
+          </div>
+        </div>
+
+        <!-- 图片 -->
+        <div class="pane" id="pane-image">
+          <input type="file" id="imageFile" accept="image/*">
+          <div class="row">
+            <label>旋转 <select id="imageRotate">
+              <option value="0" selected>0°</option><option value="90">90°</option>
+              <option value="180">180°</option><option value="270">270°</option>
+            </select></label>
+            <button class="ghost" id="imageClear">清除图片</button>
+          </div>
+          <div class="hint">图片按纸宽 384 点等比缩放，居中排版。</div>
+        </div>
+
+        <!-- 二维码 -->
+        <div class="pane" id="pane-qr">
+          <textarea id="qrInput" rows="3" placeholder="二维码内容（网址 / 文本）">https://walkprint.net/</textarea>
+          <div class="hint" id="qrHint">二维码库加载后在此生成。</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <label>浓淡</label>
+          <div class="seg" id="thicknessSeg">
+            <button data-t="light">淡</button>
+            <button data-t="moderate" class="active">中</button>
+            <button data-t="dark">浓</button>
+          </div>
+        </div>
+        <div class="row">
+          <label>二值化 <select id="binMode">
+            <option value="avg" selected>自适应平均</option>
+            <option value="fixed">固定阈值</option>
+          </select></label>
+          <label>阈值 <input id="thresholdInput" type="number" value="128" min="0" max="255" style="width:70px"></label>
+          <label><input type="checkbox" id="boldInput"> 加粗膨胀</label>
+        </div>
+        <div class="row">
+          <span class="hint" style="margin:0">打印结束自动走 5 个换行出纸。</span>
+        </div>
+        <details>
+          <summary>高级：分包与缓冲</summary>
+          <div class="row">
+            <label>单包字节 <input id="chunkInput" type="number" value="120" min="40" max="200" style="width:70px"></label>
+            <label>间隔(ms) <input id="delayInput" type="number" value="80" min="10" max="300" style="width:70px"></label>
+            <label>收尾(ms) <input id="flushInput" type="number" value="2500" min="500" max="8000" style="width:80px"></label>
+          </div>
+          <div class="hint">底部截断→调大间隔；中间白横条→调小间隔。单条位图缓冲约 80 行，超出自动分段。</div>
+        </details>
+      </div>
+    </div>
+
+    <!-- ===== 右：预览 + 日志 ===== -->
+    <div class="preview-wrap">
+      <div class="card preview-wrap">
+        <div class="hint" style="margin:0">打印预览（384 点宽，黑白位图）：</div>
+        <canvas id="preview" class="preview" width="384" height="240"></canvas>
+      </div>
+      <div class="card">
+        <div class="hint" style="margin:0 0 8px">日志：</div>
+        <pre id="log" class="log"></pre>
+      </div>
+    </div>
+  </div>
+
+<script src="qrcode.min.js"></script>
+<script>
+// ===== 协议常量 =====
+const ISSC_SERVICE = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
+const ISSC_TX      = '49535343-8841-43f4-a8d4-ecbe34729bb3';
+const ISSC_RX      = '49535343-1e4d-4bd9-ba61-23c647249616';
+const PRINTER_WIDTH = 384;
+const CHUNK_SIZE = 120, CHUNK_DELAY = 80, FLUSH_DELAY = 2500;
+const STRIP_HEIGHT = 80, STRIP_GAP_MS = 400;
+
+const $ = (id) => document.getElementById(id);
+const statusEl = $('status'), logEl = $('log'), preview = $('preview');
+const connectBtn = $('connectBtn'), printBtn = $('printBtn'), disconnectBtn = $('disconnectBtn');
+let device = null, server = null, txChar = null, rxChar = null;
+let thickness = 'moderate';
+
+function log(msg) {
+  const t = new Date().toLocaleTimeString();
+  logEl.textContent += `[${t}] ${msg}\n`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const norm = (u) => u.replace(/-/g, '').toLowerCase();
+
+// ===== ESC/POS 命令 =====
+const initCmd = () => new Uint8Array([0x1b, 0x40]);
+const lineFeeds = (n) => new Uint8Array(Array.from({ length: n }, () => 0x0a));
+
+function pixelsToBitmap(pixels) {
+  const height = pixels.length, width = pixels[0].length;
+  const widthBytes = Math.ceil(width / 8);
+  const bitmap = new Uint8Array(widthBytes * height);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++)
+      if (pixels[y][x]) bitmap[y * widthBytes + (x >> 3)] |= 1 << (7 - (x & 7));
+  return { bitmap, widthBytes, height };
+}
+
+function rasterImage(bitmap, widthBytes, height) {
+  const header = new Uint8Array([0x1d, 0x76, 0x30, 0x00,
+    widthBytes & 0xff, (widthBytes >> 8) & 0xff,
+    height & 0xff, (height >> 8) & 0xff]);
+  const out = new Uint8Array(header.length + bitmap.length);
+  out.set(header, 0); out.set(bitmap, header.length);
+  return out;
+}
+
+function concatBytes(parts) {
+  const total = parts.reduce((s, p) => s + p.length, 0);
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+
+// ===== 灰度 / 二值化 / 膨胀 =====
+function canvasToGray(canvas) {
+  const ctx = canvas.getContext('2d');
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const gray = [];
+  for (let y = 0; y < canvas.height; y++) {
+    const row = [];
+    for (let x = 0; x < canvas.width; x++) {
+      const i = (y * canvas.width + x) * 4;
+      row.push(0.299 * img.data[i] + 0.587 * img.data[i + 1] + 0.114 * img.data[i + 2]);
+    }
+    gray.push(row);
+  }
+  return gray;
+}
+
+function binarize(gray, mode, threshold) {
+  const h = gray.length, w = gray[0].length;
+  let cut = threshold;
+  if (mode === 'avg') {
+    let sum = 0;
+    for (const r of gray) for (const g of r) sum += g;
+    cut = Math.round(sum / (h * w));
+  }
+  const out = [];
+  for (let y = 0; y < h; y++) {
+    const row = [];
+    for (let x = 0; x < w; x++) row.push(gray[y][x] <= cut);
+    out.push(row);
+  }
+  return out;
+}
+
+function dilate(px) {
+  const h = px.length, w = px[0].length;
+  const out = px.map(r => r.slice());
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (px[y][x]) continue;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const ny = y + dy, nx = x + dx;
+      if (ny >= 0 && ny < h && nx >= 0 && nx < w && px[ny][nx]) { out[y][x] = true; break; }
+    }
+  }
+  return out;
+}
+
+// 浓淡档：阈值偏移 + 是否默认膨胀（可被手动控件覆盖）
+const THICKNESS = {
+  light:    { offset:  26, dilate: false },
+  moderate: { offset:   0, dilate: false },
+  dark:     { offset: -30, dilate: true  },
+};
+
+// ===== 各内容来源渲染 =====
+function renderTest() {
+  const h = 240, c = document.createElement('canvas');
+  c.width = PRINTER_WIDTH; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, PRINTER_WIDTH, h);
+  const cell = 16;
+  for (let y = 0; y < h; y += cell) for (let x = 0; x < PRINTER_WIDTH; x += cell)
+    if (((x / cell | 0) + (y / cell | 0)) % 2 === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x, y, cell, cell); }
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.strokeRect(2, 2, PRINTER_WIDTH - 4, h - 4);
+  ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = 'bold 36px monospace'; ctx.fillText('YHK TEST', PRINTER_WIDTH / 2, h / 2 - 20);
+  ctx.font = '16px monospace'; ctx.fillText(new Date().toLocaleString(), PRINTER_WIDTH / 2, h / 2 + 24);
+  ctx.fillRect(0, h - 26, PRINTER_WIDTH, 20); // 实心黑条对照
+  return { gray: canvasToGray(c), canvas: c };
+}
+
+function renderText() {
+  const text = $('textInput').value || ' ';
+  const fs = parseInt($('textSize').value, 10);
+  const bold = $('textBold').checked;
+  const align = $('textAlign').value;
+  const lineMul = parseFloat($('textLine').value);
+  const lh = Math.round(fs * lineMul);
+  const pad = 12;
+  const font = `${bold ? 'bold ' : ''}${fs}px system-ui, "Microsoft YaHei", sans-serif`;
+
+  const measure = document.createElement('canvas').getContext('2d');
+  measure.font = font;
+  // 折行
+  const lines = [];
+  for (const raw of text.split('\n')) {
+    let cur = '';
+    for (const ch of raw) {
+      if (measure.measureText(cur + ch).width > PRINTER_WIDTH - pad * 2 && cur) { lines.push(cur); cur = ch; }
+      else cur += ch;
+    }
+    lines.push(cur);
+  }
+  const h = pad * 2 + lines.length * lh;
+  const c = document.createElement('canvas');
+  c.width = PRINTER_WIDTH; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, PRINTER_WIDTH, h);
+  ctx.fillStyle = '#000'; ctx.font = font; ctx.textBaseline = 'middle';
+  lines.forEach((line, i) => {
+    const w = measure.measureText(line).width;
+    let x = pad;
+    if (align === 'center') x = (PRINTER_WIDTH - w) / 2;
+    else if (align === 'right') x = PRINTER_WIDTH - pad - w;
+    ctx.textAlign = 'left';
+    ctx.fillText(line, x, pad + i * lh + lh / 2);
+  });
+  return { gray: canvasToGray(c), canvas: c };
+}
+
+let uploadedImg = null;
+function renderImage() {
+  if (!uploadedImg) return renderTest();
+  const rot = parseInt($('imageRotate').value, 10);
+  const iw = uploadedImg.width, ih = uploadedImg.height;
+  const rot90 = rot === 90 || rot === 270;
+  const dw = PRINTER_WIDTH;
+  const dh = Math.round(ih * (dw / iw) * (rot90 ? iw / ih : 1));
+  const c = document.createElement('canvas');
+  c.width = PRINTER_WIDTH; c.height = Math.max(dh, 1);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.translate(c.width / 2, c.height / 2);
+  ctx.rotate(rot * Math.PI / 180);
+  ctx.drawImage(uploadedImg, -iw / 2, -ih / 2, iw, ih);
+  return { gray: canvasToGray(c), canvas: c };
+}
+
+let qrCanvasCache = null;
+function renderQr() {
+  const text = $('qrInput').value.trim();
+  const c = document.createElement('canvas');
+  c.width = PRINTER_WIDTH; c.height = PRINTER_WIDTH;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  if (!text || typeof QRCode === 'undefined') return { gray: canvasToGray(c), canvas: c };
+  const holder = document.createElement('div');
+  holder.style.position = 'absolute'; holder.style.left = '-9999px';
+  document.body.appendChild(holder);
+  new QRCode(holder, { text, width: 320, height: 320, correctLevel: QRCode.CorrectLevel.M });
+  const qrCanvas = holder.querySelector('canvas');
+  if (qrCanvas) {
+    const qrSize = 280;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(qrCanvas, (PRINTER_WIDTH - qrSize) / 2, (PRINTER_WIDTH - qrSize) / 2, qrSize, qrSize);
+  }
+  document.body.removeChild(holder);
+  return { gray: canvasToGray(c), canvas: c };
+}
+
+function currentSource() {
+  const pane = document.querySelector('#sourceTabs button.active').dataset.pane;
+  if (pane === 'text') return renderText();
+  if (pane === 'image') return renderImage();
+  if (pane === 'qr') return renderQr();
+  return renderTest();
+}
+
+// ===== 预览（与打印一致的二值化黑白位图） =====
+function refreshPreview() {
+  try {
+    const pixels = buildPixels();
+    const h = pixels.length, w = pixels[0].length;
+    preview.width = w; preview.height = h;
+    const ctx = preview.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#000';
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
+      if (pixels[y][x]) ctx.fillRect(x, y, 1, 1);
+  } catch (e) { log('预览刷新失败：' + (e.message || e)); }
+}
+
+// ===== 蓝牙连接 =====
+async function connect() {
+  if (!navigator.bluetooth) { log('当前浏览器不支持 Web Bluetooth，请用桌面 Chrome/Edge 并经 localhost 打开。'); return; }
+  try {
+    log('正在请求蓝牙设备（前缀 YHK）…');
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'YHK' }],
+      optionalServices: [ISSC_SERVICE, 'device_information'],
+    });
+    log('已选择设备：' + (device.name || '(无名)'));
+    server = await device.gatt.connect();
+    log('GATT 已连接，枚举服务与特征…');
+    const services = await server.getPrimaryServices();
+    for (const s of services) {
+      log('Service  ' + s.uuid);
+      for (const c of await s.getCharacteristics()) {
+        const p = c.properties;
+        log('   Char ' + c.uuid + ' | write=' + p.write + ' noResp=' + p.writeWithoutResponse + ' notify=' + p.notify);
+        if (norm(c.uuid) === norm(ISSC_TX)) txChar = c;
+        if (p.notify && !rxChar) rxChar = c;
+      }
+    }
+    if (!txChar) {
+      outer: for (const s of services) for (const c of await s.getCharacteristics())
+        if (c.properties.write || c.properties.writeWithoutResponse) { txChar = c; log('未匹配标准 TX，改用：' + c.uuid); break outer; }
+    }
+    if (!txChar) { log('错误：未找到可写特征。'); return; }
+    if (rxChar) {
+      try {
+        await rxChar.startNotifications();
+        rxChar.addEventListener('characteristicvaluechanged', (e) => {
+          const buf = new Uint8Array(e.target.value.buffer);
+          const hex = [...buf].map(b => b.toString(16).padStart(2, '0')).join(' ');
+          log('← 回传 ' + buf.length + ' 字节: ' + hex);
+        });
+      } catch (e) { log('RX 通知开启失败（可忽略）：' + e.message); }
+    }
+    device.addEventListener('gattserverdisconnected', () => { log('设备已断开'); setConnected(false); });
+    setConnected(true);
+    log('连接就绪，可以打印。');
+  } catch (e) { log('连接失败：' + (e.message || e)); }
+}
+
+function setConnected(ok) {
+  connectBtn.disabled = ok;
+  disconnectBtn.disabled = !ok;
+  printBtn.disabled = !ok;
+  statusEl.textContent = ok ? ('已连接：' + (device?.name || '')) : '未连接';
+}
+
+async function disconnect() {
+  if (device?.gatt?.connected) device.gatt.disconnect();
+  txChar = rxChar = null; server = null; device = null;
+  setConnected(false); log('已断开。');
+}
+
+async function sendChunked(data, chunkSize, delayMs, flushMs) {
+  for (let i = 0; i < data.length; i += chunkSize) {
+    await txChar.writeValueWithoutResponse(data.slice(i, i + chunkSize));
+    if (delayMs > 0 && i + chunkSize < data.length) await sleep(delayMs);
+  }
+  await sleep(flushMs);
+}
+
+// 组最终像素：应用浓淡档阈值偏移 + 膨胀
+function buildPixels() {
+  const src = currentSource();
+  const mode = $('binMode').value;
+  const threshold = parseInt($('thresholdInput').value, 10) || 128;
+  const t = THICKNESS[thickness];
+  let base = threshold;
+  if (mode === 'avg') {
+    let sum = 0;
+    for (const r of src.gray) for (const g of r) sum += g;
+    base = Math.round(sum / (src.gray.length * src.gray[0].length));
+  }
+  const cut = base + t.offset;
+  let pixels = src.gray.map(r => r.map(g => g <= cut));
+  if ($('boldInput').checked || t.dilate) pixels = dilate(pixels);
+  return pixels;
+}
+
+async function printTest() {
+  try {
+    const chunkSize = parseInt($('chunkInput').value, 10) || CHUNK_SIZE;
+    const delayMs = parseInt($('delayInput').value, 10) || CHUNK_DELAY;
+    const flushMs = parseInt($('flushInput').value, 10) || FLUSH_DELAY;
+
+    const pixels = buildPixels();
+    log(`浓淡=${thickness} 二值化=${$('binMode').value} 加粗=${$('boldInput').checked || t_dilate()}`);
+    log('初始化打印机 …');
+    await sendChunked(initCmd(), chunkSize, delayMs, 0);
+
+    let strip = 0;
+    for (let start = 0; start < pixels.length; start += STRIP_HEIGHT) {
+      const slice = pixels.slice(start, start + STRIP_HEIGHT);
+      const { bitmap, widthBytes, height: h } = pixelsToBitmap(slice);
+      const frame = rasterImage(bitmap, widthBytes, h);
+      strip++;
+      log(`第 ${strip} 条：${h} 行 / ${frame.length} 字节`);
+      await sendChunked(frame, chunkSize, delayMs, 0);
+      await sleep(STRIP_GAP_MS);
+    }
+
+    // 末尾固定走 5 个换行出纸
+    log('末尾走 5 个换行 …');
+    await sendChunked(lineFeeds(5), chunkSize, delayMs, flushMs);
+    log('任务已发送，等待出纸。');
+  } catch (e) { log('打印失败：' + (e.message || e)); }
+}
+
+function t_dilate() { return THICKNESS[thickness].dilate; }
+
+// ===== 事件绑定 =====
+$('sourceTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  document.querySelectorAll('#sourceTabs button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  $('pane-' + btn.dataset.pane).classList.add('active');
+  refreshPreview();
+});
+
+$('imageFile').addEventListener('change', (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => { uploadedImg = img; refreshPreview(); };
+  img.src = URL.createObjectURL(f);
+});
+$('imageClear').addEventListener('click', () => { uploadedImg = null; $('imageFile').value = ''; refreshPreview(); });
+
+$('thicknessSeg').addEventListener('click', (e) => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  thickness = btn.dataset.t;
+  document.querySelectorAll('#thicknessSeg button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  refreshPreview();
+});
+
+['textInput','textSize','textBold','textAlign','textLine','imageRotate','qrInput',
+ 'binMode','thresholdInput','boldInput'].forEach(id => {
+  $(id).addEventListener('input', refreshPreview);
+  $(id).addEventListener('change', refreshPreview);
+});
+
+connectBtn.addEventListener('click', connect);
+disconnectBtn.addEventListener('click', disconnect);
+printBtn.addEventListener('click', printTest);
+
+// 初始预览
+refreshPreview();
+if (typeof QRCode === 'undefined') $('qrHint').textContent = '二维码库未加载（需联网），二维码面板不可用。';
+else $('qrHint').textContent = '输入内容后自动生成二维码。';
+log('页面就绪。确认打印机开机、未连手机 App，再点“连接打印机”。');
+</script>
+</body>
+</html>
