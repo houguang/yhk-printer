@@ -1,0 +1,29 @@
+{
+  "name": "yhk-printer",
+  "version": "1.0.0",
+  "description": "YHK 迷你热敏机电脑直连打印工具",
+  "author": "yhk-printer",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.yhk.printer",
+    "productName": "YHK热敏打印",
+    "files": [
+      "main.js",
+      "app/**/*"
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "YHK热敏打印.exe"
+    }
+  }
+}
